@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #0b0f1e;
+  --color-panel-900: #151c31;
+  --color-panel-800: #1e2640;
+  --color-panel-700: #2a3356;
+  --color-brand-500: #7c6fff;
+  --color-brand-600: #5a4fd4;
+  --color-brand-200: #c8beff;
+  --color-gold-400: #ffd700;
+  --color-gold-500: #ff9f43;
+  --color-mint-400: #30e3ca;
+  --color-rose-400: #ff6b6b;
+  --color-copy-50: #e8eaf6;
+  --color-copy-300: #7a85a8;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top, rgba(124, 111, 255, 0.18), transparent 32%),
+      linear-gradient(180deg, #0f1630 0%, #0b0f1e 50%, #090d1a 100%);
+    color: var(--color-copy-50);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-panel-900);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-panel-700);
+    border-radius: 9999px;
+  }
+}
+
+@keyframes numberPop {
+  0% {
+    transform: scale(0.4) rotate(-10deg);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.2) rotate(3deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes cellMark {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cellWin {
+  from {
+    background: rgba(255, 215, 0, 0.2);
+    box-shadow: none;
+  }
+
+  to {
+    background: rgba(255, 215, 0, 0.38);
+    box-shadow: inset 0 0 8px rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes boardWin {
+  from {
+    box-shadow: 0 0 0 3px #ffd700, 0 0 20px rgba(255, 215, 0, 0.3);
+  }
+
+  to {
+    box-shadow: 0 0 0 3px #ffd700, 0 0 44px rgba(255, 215, 0, 0.7);
+  }
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes cardIn {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes emojiPop {
+  from {
+    transform: scale(0);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
