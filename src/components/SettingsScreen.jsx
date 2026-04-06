@@ -33,6 +33,7 @@ export default function SettingsScreen({ defaults, onStart, onHome }) {
           </span>
         </h1>
 
+        {gameMode !== 'online' && (
         <section className={cardClass}>
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-copy-300">Number Range</h2>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -53,9 +54,10 @@ export default function SettingsScreen({ defaults, onStart, onHome }) {
             ))}
           </div>
         </section>
+        )}
 
+        {gameMode !== 'online' && (
         <section className={cardClass}>
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-copy-300">Call Mode</h2>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               className={[
@@ -101,6 +103,7 @@ export default function SettingsScreen({ defaults, onStart, onHome }) {
             </div>
           )}
         </section>
+        )}
 
         <section className={cardClass}>
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-copy-300">Game Mode</h2>
@@ -127,14 +130,25 @@ export default function SettingsScreen({ defaults, onStart, onHome }) {
             >
               Vs AI
             </button>
+            <button
+              className={[
+                toggleBase,
+                gameMode === 'online'
+                  ? 'border-emerald-400 bg-emerald-500/15 text-emerald-300'
+                  : 'border-transparent bg-panel-800 text-copy-50 hover:border-emerald-400/80',
+              ].join(' ')}
+              onClick={() => setGameMode('online')}
+            >
+              🌐 Online
+            </button>
           </div>
         </section>
 
         <button
-          className="rounded-full bg-linear-to-r from-brand-500 to-brand-600 px-12 py-4 text-lg font-extrabold tracking-[0.08em] text-white shadow-[0_10px_30px_rgba(124,111,255,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(124,111,255,0.55)]"
+          className={`rounded-full bg-linear-to-r ${gameMode === 'online' ? 'from-emerald-500 to-cyan-500' : 'from-brand-500 to-brand-600'} px-12 py-4 text-lg font-extrabold tracking-[0.08em] text-white shadow-[0_10px_30px_rgba(124,111,255,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(124,111,255,0.55)]`}
           onClick={() => onStart({ range, callMode, autoSpeed, gameMode })}
         >
-          Start Game
+          {gameMode === 'online' ? '🌐 Go Online' : 'Start Game'}
         </button>
 
         {onHome && (

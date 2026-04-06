@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SettingsScreen from '../components/SettingsScreen';
 import GameScreen from '../components/GameScreen';
+import OnlineBingoView from './OnlineBingoPage';
 
 const DEFAULT_SETTINGS = {
   range: 64,
@@ -14,18 +15,25 @@ export default function BingoPage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
 
-  // Use the settings object as a key so GameScreen fully remounts on new game
-  return settings ? (
+  if (!settings) {
+    return (
+      <SettingsScreen
+        defaults={DEFAULT_SETTINGS}
+        onStart={setSettings}
+        onHome={() => navigate('/')}
+      />
+    );
+  }
+
+  if (settings.gameMode === 'online') {
+    return <OnlineBingoView onBack={() => setSettings(null)} />;
+  }
+
+  return (
     <GameScreen
       key={JSON.stringify(settings)}
       settings={settings}
       onBack={() => setSettings(null)}
-    />
-  ) : (
-    <SettingsScreen
-      defaults={DEFAULT_SETTINGS}
-      onStart={setSettings}
-      onHome={() => navigate('/')}
     />
   );
 }
