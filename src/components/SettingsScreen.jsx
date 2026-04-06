@@ -13,7 +13,7 @@ const SPEEDS = [
   { value: 5000, label: '5 s' },
 ];
 
-export default function SettingsScreen({ defaults, onStart }) {
+export default function SettingsScreen({ defaults, onStart, onHome }) {
   const [range,     setRange]     = useState(defaults.range);
   const [callMode,  setCallMode]  = useState(defaults.callMode);
   const [autoSpeed, setAutoSpeed] = useState(defaults.autoSpeed);
@@ -136,6 +136,15 @@ export default function SettingsScreen({ defaults, onStart }) {
         >
           Start Game
         </button>
+
+        {onHome && (
+          <button
+            className="rounded-full border-2 border-panel-700 bg-panel-900/50 px-10 py-3 font-semibold text-copy-300 transition hover:border-copy-300 hover:text-copy-50"
+            onClick={onHome}
+          >
+            ← Back to Games
+          </button>
+        )}
       </div>
     </div>
   );
