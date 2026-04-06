@@ -42,7 +42,6 @@ const GAMES = [
     description: 'Arcade movement, tight turns, longer runs',
     emoji: '🐍',
     color: 'from-emerald-500 to-lime-600',
-    comingSoon: true,
   },
   {
     id: 'minesweeper',

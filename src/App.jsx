@@ -5,6 +5,7 @@ import TicTacToePage from './pages/TicTacToe';
 import Connect4Page from './pages/Connect4Page';
 import MemoryMatchPage from './pages/MemoryMatchPage';
 import Game2048Page from './pages/Game2048Page';
+import SnakePage from './pages/SnakePage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/game/connect4" element={<Connect4Page />} />
         <Route path="/game/memory-match" element={<MemoryMatchPage />} />
         <Route path="/game/2048" element={<Game2048Page />} />
+        <Route path="/game/snake" element={<SnakePage />} />
       </Routes>
     </Router>
   );

@@ -20,67 +20,68 @@ function generateDeck(pairCount) {
 
 export function useMemoryMatch({ pairs = 8 } = {}) {
   const [cards, setCards] = useState(() => generateDeck(pairs));
-  const [flipped, setFlipped] = useState([]);    // indices of currently flipped (max 2)
   const [moves, setMoves] = useState(0);
   const [matches, setMatches] = useState(0);
-  const lockedRef = useRef(false);               // ref to prevent clicks during mismatch delay (avoids stale closure)
+  const lockedRef = useRef(false);
+  const flippedRef = useRef([]);
+  const cardsRef = useRef(cards);      // synchronous mirror of cards state
 
   const totalPairs = pairs;
   const gameOver = matches === totalPairs;
 
   const flipCard = useCallback((index) => {
     if (lockedRef.current) return;
-    setCards(prev => {
-      const card = prev[index];
-      if (card.flipped || card.matched) return prev;
+    if (flippedRef.current.includes(index)) return;
+    if (flippedRef.current.length >= 2) return;
 
-      const next = prev.map((c, i) => i === index ? { ...c, flipped: true } : c);
+    const cur = cardsRef.current;
+    const card = cur[index];
+    if (card.flipped || card.matched) return;
 
-      setFlipped(prevFlipped => {
-        const newFlipped = [...prevFlipped, index];
+    // Flip the card — direct value, no updater function
+    const afterFlip = cur.map((c, i) => i === index ? { ...c, flipped: true } : c);
+    cardsRef.current = afterFlip;
+    setCards(afterFlip);
 
-        if (newFlipped.length === 2) {
-          setMoves(m => m + 1);
-          const [first, second] = newFlipped;
-          const firstCard = prev[first];
-          const secondCard = next[second];
+    flippedRef.current = [...flippedRef.current, index];
 
-          if (firstCard.emoji === secondCard.emoji) {
-            // Match found
-            setCards(curr =>
-              curr.map((c, i) =>
-                i === first || i === second ? { ...c, matched: true, flipped: true } : c
-              )
-            );
-            setMatches(m => m + 1);
-            return [];
-          } else {
-            // Mismatch – flip back after delay
-            lockedRef.current = true;
-            setTimeout(() => {
-              setCards(curr =>
-                curr.map((c, i) =>
-                  i === first || i === second ? { ...c, flipped: false } : c
-                )
-              );
-              lockedRef.current = false;
-            }, 800);
-            return [];
-          }
-        }
-        return newFlipped;
-      });
+    if (flippedRef.current.length === 2) {
+      setMoves(m => m + 1);
+      const [first, second] = flippedRef.current;
 
-      return next;
-    });
+      if (afterFlip[first].emoji === afterFlip[second].emoji) {
+        // Match — all setters at top level with direct values
+        const afterMatch = afterFlip.map((c, i) =>
+          i === first || i === second ? { ...c, matched: true, flipped: true } : c
+        );
+        cardsRef.current = afterMatch;
+        setCards(afterMatch);
+        setMatches(m => m + 1);
+        flippedRef.current = [];
+      } else {
+        // Mismatch — flip back after delay
+        lockedRef.current = true;
+        setTimeout(() => {
+          const afterUnflip = cardsRef.current.map((c, i) =>
+            i === first || i === second ? { ...c, flipped: false } : c
+          );
+          cardsRef.current = afterUnflip;
+          setCards(afterUnflip);
+          lockedRef.current = false;
+          flippedRef.current = [];
+        }, 800);
+      }
+    }
   }, []);
 
   const reset = useCallback(() => {
-    setCards(generateDeck(pairs));
-    setFlipped([]);
+    const deck = generateDeck(pairs);
+    cardsRef.current = deck;
+    setCards(deck);
     setMoves(0);
     setMatches(0);
     lockedRef.current = false;
+    flippedRef.current = [];
   }, [pairs]);
 
   return { cards, moves, matches, totalPairs, gameOver, flipCard, reset };
