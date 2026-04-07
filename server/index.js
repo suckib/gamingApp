@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import RoomManager from './roomManager.js';
+import TttRoomManager from './tttRoomManager.js';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────
 
@@ -19,12 +20,16 @@ const io = new Server(httpServer, {
 });
 
 const rooms = new RoomManager();
+const tttRooms = new TttRoomManager();
 
 // Health endpoint
-app.get('/', (_req, res) => res.json({ status: 'ok', rooms: rooms.rooms.size }));
+app.get('/', (_req, res) => res.json({ status: 'ok', bingoRooms: rooms.rooms.size, tttRooms: tttRooms.rooms.size }));
 
 // Idle cleanup every 5 minutes
-setInterval(() => rooms.cleanupIdle(), 5 * 60 * 1000);
+setInterval(() => {
+  rooms.cleanupIdle();
+  tttRooms.cleanupIdle();
+}, 5 * 60 * 1000);
 
 // ─── Socket.io Events ───────────────────────────────────────────────────
 
@@ -173,6 +178,95 @@ io.on('connection', (socket) => {
   socket.on('disconnect', (reason) => {
     console.log(`[disconnect] ${socket.id} — ${reason}`);
     handleLeave(socket);
+    handleTttLeave(socket);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ═══ TIC-TAC-TOE EVENTS ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
+
+  socket.on('ttt:create', ({ playerName } = {}) => {
+    const result = tttRooms.createRoom(socket.id, playerName);
+    if (result.error) { socket.emit('ttt:error', { message: result.error }); return; }
+    const { room, code } = result;
+    socket.join(`ttt-${code}`);
+    socket.emit('ttt:created', {
+      roomCode: code,
+      playerId: socket.id,
+      players: tttRooms.serializePlayers(room),
+    });
+    console.log(`[ttt:create] ${code} by ${socket.id}`);
+  });
+
+  socket.on('ttt:join', ({ roomCode, playerName } = {}) => {
+    const code = (roomCode || '').toUpperCase().trim();
+    const result = tttRooms.joinRoom(code, socket.id, playerName);
+    if (result.error) { socket.emit('ttt:error', { message: result.error }); return; }
+    const { room } = result;
+    socket.join(`ttt-${code}`);
+    socket.emit('ttt:joined', {
+      roomCode: code,
+      playerId: socket.id,
+      players: tttRooms.serializePlayers(room),
+    });
+    socket.to(`ttt-${code}`).emit('ttt:updated', {
+      players: tttRooms.serializePlayers(room),
+    });
+    console.log(`[ttt:join] ${socket.id} → ${code}`);
+  });
+
+  socket.on('ttt:leave', () => {
+    handleTttLeave(socket);
+  });
+
+  socket.on('ttt:start', () => {
+    const room = tttRooms.getPlayerRoom(socket.id);
+    if (!room || room.hostId !== socket.id) {
+      socket.emit('ttt:error', { message: 'Only host can start' }); return;
+    }
+    const result = tttRooms.startGame(room.code);
+    if (result.error) { socket.emit('ttt:error', { message: result.error }); return; }
+
+    io.to(`ttt-${room.code}`).emit('ttt:started', {
+      board: room.board,
+      currentTurn: room.currentTurn,
+      players: tttRooms.serializePlayers(room),
+    });
+    console.log(`[ttt:start] ${room.code}`);
+  });
+
+  socket.on('ttt:move', ({ index } = {}) => {
+    const room = tttRooms.getPlayerRoom(socket.id);
+    if (!room) { socket.emit('ttt:error', { message: 'Not in a room' }); return; }
+
+    const result = tttRooms.makeMove(room.code, socket.id, index);
+    if (result.error) { socket.emit('ttt:error', { message: result.error }); return; }
+
+    io.to(`ttt-${room.code}`).emit('ttt:moved', {
+      board: result.board,
+      currentTurn: room.currentTurn,
+      index,
+      symbol: room.players.get(socket.id).symbol === 'X' ? 'X' : 'O',
+    });
+
+    if (result.winner) {
+      io.to(`ttt-${room.code}`).emit('ttt:gameover', result.winner);
+    }
+  });
+
+  socket.on('ttt:playAgain', () => {
+    const room = tttRooms.getPlayerRoom(socket.id);
+    if (!room || room.hostId !== socket.id) return;
+
+    const result = tttRooms.resetGame(room.code);
+    if (result.error) return;
+
+    io.to(`ttt-${room.code}`).emit('ttt:restarted', {
+      board: room.board,
+      currentTurn: room.currentTurn,
+      players: tttRooms.serializePlayers(room),
+    });
+    console.log(`[ttt:playAgain] ${room.code}`);
   });
 });
 
@@ -189,7 +283,6 @@ function handleLeave(socket) {
     io.to(room.code).emit('room:updated', {
       players: rooms.serializePlayers(room),
     });
-    // If game ended because opponents left
     if (room.winner && room.winner.reason === 'opponents_left') {
       io.to(room.code).emit('game:winner', {
         winnerId: room.winner.id,
@@ -200,6 +293,24 @@ function handleLeave(socket) {
     }
   }
   console.log(`[leave] ${socket.id} from ${room.code}${destroyed ? ' (destroyed)' : ''}`);
+}
+
+function handleTttLeave(socket) {
+  const result = tttRooms.leaveRoom(socket.id);
+  if (!result) return;
+
+  const { room, destroyed } = result;
+  socket.leave(`ttt-${room.code}`);
+
+  if (!destroyed) {
+    io.to(`ttt-${room.code}`).emit('ttt:updated', {
+      players: tttRooms.serializePlayers(room),
+    });
+    if (room.winner && room.winner.reason === 'opponent_left') {
+      io.to(`ttt-${room.code}`).emit('ttt:gameover', room.winner);
+    }
+  }
+  console.log(`[ttt:leave] ${socket.id} from ${room.code}${destroyed ? ' (destroyed)' : ''}`);
 }
 
 function executeDraw(room) {
@@ -249,6 +360,6 @@ function startAutoDraw(room) {
 
 // ─── Start ───────────────────────────────────────────────────────────────
 
-httpServer.listen(PORT, () => {
-  console.log(`🎱 Bingo server listening on http://localhost:${PORT}`);
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`🎱 Bingo server listening on http://0.0.0.0:${PORT}`);
 });

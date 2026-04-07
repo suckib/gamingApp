@@ -10,7 +10,7 @@ export default function TicTacToeSettings({ onSelectMode, onBack }) {
       </div>
 
       {/* Mode Selection Cards */}
-      <div className="grid w-full gap-6 sm:grid-cols-2">
+      <div className="grid w-full gap-6 sm:grid-cols-3">
         {/* Multiplayer Card */}
         <button
           onClick={() => onSelectMode('multiplayer')}
@@ -33,6 +33,19 @@ export default function TicTacToeSettings({ onSelectMode, onBack }) {
           <h2 className="text-2xl font-bold text-ink-950">Vs AI</h2>
           <p className="text-sm text-amber-900">Challenge the computer</p>
           <div className="mt-2 inline-flex items-center gap-2 font-semibold text-ink-950">
+            Play <span>→</span>
+          </div>
+        </button>
+
+        {/* Online Card */}
+        <button
+          onClick={() => onSelectMode('online')}
+          className="group flex flex-col gap-4 rounded-2xl border border-panel-700 bg-linear-to-br from-emerald-500 to-cyan-500 p-8 text-left shadow-[0_16px_48px_rgba(0,0,0,0.35)] transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(16,185,129,0.35)]"
+        >
+          <div className="text-5xl">🌐</div>
+          <h2 className="text-2xl font-bold text-white">Online</h2>
+          <p className="text-sm text-emerald-100">Play over the network</p>
+          <div className="mt-2 inline-flex items-center gap-2 text-white font-semibold">
             Play <span>→</span>
           </div>
         </button>
