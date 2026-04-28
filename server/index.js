@@ -4,6 +4,8 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import RoomManager from './roomManager.js';
 import TttRoomManager from './tttRoomManager.js';
+import BattleshipRoomManager from './battleshipRoomManager.js';
+import { randomFleet } from './battleshipEngine.js';
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────
 
@@ -21,14 +23,21 @@ const io = new Server(httpServer, {
 
 const rooms = new RoomManager();
 const tttRooms = new TttRoomManager();
+const bsRooms = new BattleshipRoomManager();
 
 // Health endpoint
-app.get('/', (_req, res) => res.json({ status: 'ok', bingoRooms: rooms.rooms.size, tttRooms: tttRooms.rooms.size }));
+app.get('/', (_req, res) => res.json({
+  status: 'ok',
+  bingoRooms: rooms.rooms.size,
+  tttRooms: tttRooms.rooms.size,
+  bsRooms: bsRooms.rooms.size,
+}));
 
 // Idle cleanup every 5 minutes
 setInterval(() => {
   rooms.cleanupIdle();
   tttRooms.cleanupIdle();
+  bsRooms.cleanupIdle();
 }, 5 * 60 * 1000);
 
 // ─── Socket.io Events ───────────────────────────────────────────────────
@@ -179,6 +188,7 @@ io.on('connection', (socket) => {
     console.log(`[disconnect] ${socket.id} — ${reason}`);
     handleLeave(socket);
     handleTttLeave(socket);
+    handleBsLeave(socket);
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -268,6 +278,128 @@ io.on('connection', (socket) => {
     });
     console.log(`[ttt:playAgain] ${room.code}`);
   });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ═══ BATTLESHIP EVENTS ════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
+
+  socket.on('bs:create', ({ playerName } = {}) => {
+    const result = bsRooms.createRoom(socket.id, playerName);
+    if (result.error) { socket.emit('bs:error', { message: result.error }); return; }
+    const { room, code } = result;
+    socket.join(`bs-${code}`);
+    socket.emit('bs:created', {
+      roomCode: code,
+      playerId: socket.id,
+      players: bsRooms.serializePlayers(room),
+    });
+    console.log(`[bs:create] ${code} by ${socket.id}`);
+  });
+
+  socket.on('bs:join', ({ roomCode, playerName } = {}) => {
+    const code = (roomCode || '').toUpperCase().trim();
+    const result = bsRooms.joinRoom(code, socket.id, playerName);
+    if (result.error) { socket.emit('bs:error', { message: result.error }); return; }
+    const { room } = result;
+    socket.join(`bs-${code}`);
+    socket.emit('bs:joined', {
+      roomCode: code,
+      playerId: socket.id,
+      players: bsRooms.serializePlayers(room),
+    });
+    socket.to(`bs-${code}`).emit('bs:updated', {
+      players: bsRooms.serializePlayers(room),
+    });
+    console.log(`[bs:join] ${socket.id} → ${code}`);
+  });
+
+  socket.on('bs:leave', () => { handleBsLeave(socket); });
+
+  socket.on('bs:start', () => {
+    const room = bsRooms.getPlayerRoom(socket.id);
+    if (!room || room.hostId !== socket.id) {
+      socket.emit('bs:error', { message: 'Only host can start' }); return;
+    }
+    const result = bsRooms.startPlacement(room.code);
+    if (result.error) { socket.emit('bs:error', { message: result.error }); return; }
+
+    io.to(`bs-${room.code}`).emit('bs:placementStarted', {
+      players: bsRooms.serializePlayers(room),
+    });
+    console.log(`[bs:start] ${room.code}`);
+  });
+
+  socket.on('bs:randomFleet', () => {
+    try {
+      const ships = randomFleet();
+      socket.emit('bs:randomFleet', { ships });
+    } catch (err) {
+      socket.emit('bs:error', { message: 'Failed to generate fleet' });
+    }
+  });
+
+  socket.on('bs:placeFleet', ({ ships } = {}) => {
+    const room = bsRooms.getPlayerRoom(socket.id);
+    if (!room) { socket.emit('bs:error', { message: 'Not in a room' }); return; }
+
+    const result = bsRooms.submitPlacement(room.code, socket.id, ships);
+    if (result.error) { socket.emit('bs:error', { message: result.error }); return; }
+
+    io.to(`bs-${room.code}`).emit('bs:placementReady', {
+      playerId: socket.id,
+      players: bsRooms.serializePlayers(room),
+    });
+
+    if (result.started) {
+      // Send each player their own fleet + shared turn info
+      for (const [id, player] of room.players) {
+        io.to(id).emit('bs:gameStarted', {
+          currentTurn: room.currentTurn,
+          ships: player.ships,
+        });
+      }
+      console.log(`[bs:gameStarted] ${room.code}`);
+    }
+  });
+
+  socket.on('bs:fire', ({ row, col } = {}) => {
+    const room = bsRooms.getPlayerRoom(socket.id);
+    if (!room) { socket.emit('bs:error', { message: 'Not in a room' }); return; }
+
+    const result = bsRooms.fireShot(room.code, socket.id, row, col);
+    if (result.error) { socket.emit('bs:error', { message: result.error }); return; }
+
+    io.to(`bs-${room.code}`).emit('bs:shotResult', {
+      shooterId: result.shooterId,
+      row: result.row,
+      col: result.col,
+      result: result.result,
+      ship: result.ship,
+      nextTurn: result.nextTurn,
+    });
+
+    if (result.gameOver) {
+      io.to(`bs-${room.code}`).emit('bs:gameOver', {
+        winnerId: result.winner.winnerId,
+        winnerName: result.winner.winnerName,
+        reason: result.winner.reason,
+      });
+      console.log(`[bs:gameOver] ${room.code} winner=${result.winner.winnerId}`);
+    }
+  });
+
+  socket.on('bs:playAgain', () => {
+    const room = bsRooms.getPlayerRoom(socket.id);
+    if (!room || room.hostId !== socket.id) return;
+
+    const result = bsRooms.resetGame(room.code);
+    if (result.error) return;
+
+    io.to(`bs-${room.code}`).emit('bs:placementStarted', {
+      players: bsRooms.serializePlayers(room),
+    });
+    console.log(`[bs:playAgain] ${room.code}`);
+  });
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -311,6 +443,28 @@ function handleTttLeave(socket) {
     }
   }
   console.log(`[ttt:leave] ${socket.id} from ${room.code}${destroyed ? ' (destroyed)' : ''}`);
+}
+
+function handleBsLeave(socket) {
+  const result = bsRooms.leaveRoom(socket.id);
+  if (!result) return;
+
+  const { room, destroyed } = result;
+  socket.leave(`bs-${room.code}`);
+
+  if (!destroyed) {
+    io.to(`bs-${room.code}`).emit('bs:updated', {
+      players: bsRooms.serializePlayers(room),
+    });
+    if (room.winner && room.winner.reason === 'opponent_left') {
+      io.to(`bs-${room.code}`).emit('bs:gameOver', {
+        winnerId: room.winner.winnerId,
+        winnerName: room.winner.winnerName,
+        reason: 'opponent_left',
+      });
+    }
+  }
+  console.log(`[bs:leave] ${socket.id} from ${room.code}${destroyed ? ' (destroyed)' : ''}`);
 }
 
 function executeDraw(room) {

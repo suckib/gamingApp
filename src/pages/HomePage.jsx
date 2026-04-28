@@ -44,6 +44,13 @@ const GAMES = [
     color: 'from-emerald-500 to-lime-600',
   },
   {
+    id: 'battleship',
+    name: 'Battleship',
+    description: 'Place your fleet, hunt the enemy across the grid',
+    emoji: '🚢',
+    color: 'from-sky-600 to-indigo-700',
+  },
+  {
     id: 'minesweeper',
     name: 'Minesweeper',
     description: 'Clear the grid without triggering hidden mines',

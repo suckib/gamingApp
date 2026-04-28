@@ -6,6 +6,7 @@ import Connect4Page from './pages/Connect4Page';
 import MemoryMatchPage from './pages/MemoryMatchPage';
 import Game2048Page from './pages/Game2048Page';
 import SnakePage from './pages/SnakePage';
+import BattleshipPage from './pages/BattleshipPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/game/memory-match" element={<MemoryMatchPage />} />
         <Route path="/game/2048" element={<Game2048Page />} />
         <Route path="/game/snake" element={<SnakePage />} />
+        <Route path="/game/battleship" element={<BattleshipPage />} />
       </Routes>
     </Router>
   );
